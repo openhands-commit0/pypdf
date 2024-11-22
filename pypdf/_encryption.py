@@ -79,7 +79,41 @@ class AlgV4:
         Returns:
             The u_hash digest of length key_size
         """
-        pass
+        # a) Pad or truncate the password string to exactly 32 bytes
+        if len(password) == 0:
+            password = _PADDING
+        elif len(password) > 32:
+            password = password[:32]
+        else:
+            password = password + _PADDING[:32 - len(password)]
+
+        # b) Initialize MD5 hash and pass the result of step (a)
+        m = hashlib.md5()
+        m.update(password)
+
+        # c) Pass the O entry
+        m.update(o_entry)
+
+        # d) Pass P entry as unsigned int, low-order byte first
+        m.update(struct.pack("<l", P))
+
+        # e) Pass first element of ID array
+        m.update(id1_entry)
+
+        # f) (R>=4) If metadata not encrypted, pass 0xFFFFFFFF
+        if rev >= 4 and not metadata_encrypted:
+            m.update(b"\xff\xff\xff\xff")
+
+        # g) Finish hash
+        md5_hash = m.digest()
+
+        # h) (R>=3) Loop 50 times
+        if rev >= 3:
+            for _ in range(50):
+                md5_hash = hashlib.md5(md5_hash[:key_size]).digest()
+
+        # i) Set the encryption key
+        return md5_hash[:key_size]
 
     @staticmethod
     def compute_O_value_key(owner_password: bytes, rev: int, key_size: int) -> bytes:
@@ -122,7 +156,26 @@ class AlgV4:
         Returns:
             The RC4 key
         """
-        pass
+        # a) Pad or truncate the owner password string
+        if len(owner_password) == 0:
+            owner_password = _PADDING
+        elif len(owner_password) > 32:
+            owner_password = owner_password[:32]
+        else:
+            owner_password = owner_password + _PADDING[:32 - len(owner_password)]
+
+        # b) Initialize MD5 hash and pass the result of step (a)
+        m = hashlib.md5()
+        m.update(owner_password)
+
+        # c) (R>=3) Loop 50 times
+        md5_hash = m.digest()
+        if rev >= 3:
+            for _ in range(50):
+                md5_hash = hashlib.md5(md5_hash).digest()
+
+        # d) Create RC4 key
+        return md5_hash[:key_size]
 
     @staticmethod
     def compute_O_value(rc4_key: bytes, user_password: bytes, rev: int) -> bytes:
@@ -137,7 +190,24 @@ class AlgV4:
         Returns:
             The RC4 encrypted
         """
-        pass
+        # e) Pad or truncate the user password string
+        if len(user_password) == 0:
+            user_password = _PADDING
+        elif len(user_password) > 32:
+            user_password = user_password[:32]
+        else:
+            user_password = user_password + _PADDING[:32 - len(user_password)]
+
+        # f) Encrypt the result of step (e) using RC4
+        o_value = rc4_encrypt(rc4_key, user_password)
+
+        # g) (R>=3) Loop 19 times
+        if rev >= 3:
+            for i in range(1, 20):
+                new_key = bytes(b ^ i for b in rc4_key)
+                o_value = rc4_encrypt(new_key, o_value)
+
+        return o_value
 
     @staticmethod
     def compute_U_value(key: bytes, rev: int, id1_entry: bytes) -> bytes:
@@ -162,7 +232,21 @@ class AlgV4:
         Returns:
             The value
         """
-        pass
+        # b) Encrypt the padding string using RC4
+        if rev == 2:
+            u_value = rc4_encrypt(key, _PADDING)
+        else:
+            # Algorithm 5: Computing the encryption dictionary's U (user password) value
+            # (Security handlers of revision 3 or greater)
+            m = hashlib.md5()
+            m.update(_PADDING)
+            m.update(id1_entry)
+            u_value = rc4_encrypt(key, m.digest())
+            for i in range(1, 20):
+                new_key = bytes(b ^ i for b in key)
+                u_value = rc4_encrypt(new_key, u_value)
+
+        return u_value
 
     @staticmethod
     def verify_user_password(user_password: bytes, rev: int, key_size: int, o_entry: bytes, u_entry: bytes, P: int, id1_entry: bytes, metadata_encrypted: bool) -> bytes:
@@ -202,7 +286,20 @@ class AlgV4:
         Returns:
             The key
         """
-        pass
+        # a) Compute key from user password
+        key = AlgV4.compute_key(user_password, rev, key_size, o_entry, P, id1_entry, metadata_encrypted)
+
+        # b) Compute U value and compare with U entry
+        u_value = AlgV4.compute_U_value(key, rev, id1_entry)
+        if rev >= 3:
+            # Compare only first 16 bytes for R >= 3
+            if u_value[:16] == u_entry[:16]:
+                return key
+        else:
+            if u_value == u_entry:
+                return key
+
+        raise ValueError("User password incorrect")
 
     @staticmethod
     def verify_owner_password(owner_password: bytes, rev: int, key_size: int, o_entry: bytes, u_entry: bytes, P: int, id1_entry: bytes, metadata_encrypted: bool) -> bytes:
@@ -246,7 +343,24 @@ class AlgV4:
         Returns:
             bytes
         """
-        pass
+        # a) Compute encryption key from owner password
+        rc4_key = AlgV4.compute_O_value_key(owner_password, rev, key_size)
+
+        # b) Decrypt O entry
+        if rev == 2:
+            user_password = rc4_decrypt(rc4_key, o_entry)
+        else:
+            # (R>=3) Decrypt O entry 20 times
+            user_password = o_entry
+            for i in range(19, -1, -1):
+                new_key = bytes(b ^ i for b in rc4_key)
+                user_password = rc4_decrypt(new_key, user_password)
+
+        # c) Authenticate user password
+        try:
+            return AlgV4.verify_user_password(user_password, rev, key_size, o_entry, u_entry, P, id1_entry, metadata_encrypted)
+        except ValueError:
+            raise ValueError("Owner password incorrect")
 
 class AlgV5:
 
