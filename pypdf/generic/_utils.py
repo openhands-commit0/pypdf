@@ -39,6 +39,78 @@ def read_hex_string_from_stream(stream: StreamType) -> str:
     except ValueError:
         return ""
 
+def read_string_from_stream(stream: StreamType) -> str:
+    """
+    Read a string from a stream.
+
+    Args:
+        stream: A file object (with read and seek methods)
+
+    Returns:
+        The decoded string
+
+    Raises:
+        PdfStreamError: If the stream ends before finding a closing ')'
+    """
+    tok = stream.read(1)
+    if not tok:
+        raise PdfStreamError("Stream has ended unexpectedly")
+    if tok != b"(":
+        raise PdfStreamError("Stream has ended unexpectedly")
+
+    parens = 1
+    txt = b""
+    while True:
+        tok = stream.read(1)
+        if not tok:
+            raise PdfStreamError("Stream has ended unexpectedly")
+        
+        if tok == b"\\":  # Escape sequence
+            tok = stream.read(1)
+            if not tok:
+                raise PdfStreamError("Stream has ended unexpectedly")
+            if tok in b"01234567":  # Octal escape
+                octal_str = tok
+                for _ in range(2):
+                    tok = stream.read(1)
+                    if not tok or tok not in b"01234567":
+                        break
+                    octal_str += tok
+                txt += bytes([int(octal_str.decode(), 8)])
+            elif tok == b"\n":  # Line continuation
+                continue
+            elif tok == b"\r":  # Line continuation
+                tok2 = stream.read(1)
+                if tok2 == b"\n":  # Skip \r\n
+                    continue
+                stream.seek(-1, 1)  # Push back tok2
+                continue
+            else:  # Simple escape
+                if tok == b"n":
+                    txt += b"\n"
+                elif tok == b"r":
+                    txt += b"\r"
+                elif tok == b"t":
+                    txt += b"\t"
+                elif tok == b"b":
+                    txt += b"\b"
+                elif tok == b"f":
+                    txt += b"\f"
+                else:
+                    txt += tok  # Just add the escaped char
+        elif tok == b"(":
+            parens += 1
+            txt += tok
+        elif tok == b")":
+            parens -= 1
+            if parens == 0:
+                break
+            txt += tok
+        else:
+            txt += tok
+
+    return txt.decode('latin1')
+
 def encode_pdfdocencoding(unicode_string: str) -> bytes:
     """
     Encodes a string into the PDFDocEncoding.
