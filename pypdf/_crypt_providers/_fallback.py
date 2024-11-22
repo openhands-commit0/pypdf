@@ -3,6 +3,14 @@ from pypdf.errors import DependencyError
 _DEPENDENCY_ERROR_STR = 'cryptography>=3.1 is required for AES algorithm'
 crypt_provider = ('local_crypt_fallback', '0.0.0')
 
+def rc4_encrypt(key: bytes, data: bytes) -> bytes:
+    rc4 = CryptRC4(key)
+    return rc4.encrypt(data)
+
+def rc4_decrypt(key: bytes, data: bytes) -> bytes:
+    rc4 = CryptRC4(key)
+    return rc4.decrypt(data)
+
 def aes_cbc_decrypt(key: bytes, data: bytes, iv: bytes = bytes(16)) -> bytes:
     raise DependencyError(_DEPENDENCY_ERROR_STR)
 
