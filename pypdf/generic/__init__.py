@@ -43,8 +43,8 @@ from ._base import (
     NumberObject,
     PdfObject,
     TextStringObject,
-    encode_pdfdocencoding,
 )
+from ._utils import encode_pdfdocencoding
 from ._data_structures import (
     ArrayObject,
     ContentStream,
