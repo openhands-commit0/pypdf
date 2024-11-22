@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from io import DEFAULT_BUFFER_SIZE, BytesIO
 from os import SEEK_CUR
 from typing import IO, Any, Dict, List, Optional, Pattern, Tuple, Union, cast, overload
+from ._text_utils import b_, str_
 if sys.version_info[:2] >= (3, 10):
     from typing import TypeAlias
 else:

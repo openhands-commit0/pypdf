@@ -7,7 +7,8 @@ from math import log10
 from typing import Any, Callable, ClassVar, Dict, Optional, Sequence, Union, cast
 from .._codecs import _pdfdoc_encoding_rev
 from .._protocols import PdfObjectProtocol, PdfWriterProtocol
-from .._utils import StreamType, b_, deprecate_no_replacement, logger_warning, read_non_whitespace, read_until_regex, str_
+from .._text_utils import b_, str_
+from .._utils import StreamType, deprecate_no_replacement, logger_warning, read_non_whitespace, read_until_regex
 from ..errors import STREAM_TRUNCATED_PREMATURELY, PdfReadError, PdfStreamError
 __author__ = 'Mathieu Fenniak'
 __author_email__ = 'biziqe@mathieu.fenniak.net'
