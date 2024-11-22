@@ -5,6 +5,40 @@ from .._utils import StreamType, b_, logger_warning, read_non_whitespace
 from ..errors import STREAM_TRUNCATED_PREMATURELY, PdfStreamError
 from ._base import ByteStringObject, TextStringObject
 
+def read_hex_string_from_stream(stream: StreamType) -> str:
+    """
+    Read a hex string from a stream.
+
+    Args:
+        stream: A file object (with read and seek methods)
+
+    Returns:
+        The decoded string
+
+    Raises:
+        PdfStreamError: If the stream ends before finding a closing '>'
+    """
+    hex_str = b""
+    while True:
+        tok = stream.read(1)
+        if not tok:
+            raise PdfStreamError("Stream has ended unexpectedly")
+        if tok == b">":
+            break
+        hex_str += tok
+
+    # If odd number of digits, assume last digit is 0
+    if len(hex_str) % 2 == 1:
+        hex_str += b"0"
+
+    # Convert hex to bytes
+    try:
+        hex_str = hex_str.replace(b" ", b"")  # Remove whitespace
+        hex_bytes = bytes.fromhex(hex_str.decode())
+        return hex_bytes.decode('latin1')  # Use latin1 to map bytes directly to chars
+    except ValueError:
+        return ""
+
 def encode_pdfdocencoding(unicode_string: str) -> bytes:
     """
     Encodes a string into the PDFDocEncoding.
