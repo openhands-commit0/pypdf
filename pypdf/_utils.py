@@ -124,6 +124,23 @@ def read_previous_line(stream: StreamType) -> bytes:
 def mark_location(stream: StreamType) -> None:
     """Create text file showing current location in context."""
     pass
+
+def skip_over_comment(stream: StreamType) -> None:
+    """
+    Skip over any comment that begins with the % sign.
+
+    The implementation is stable for
+    - % followed by any data
+    - % followed by any data, then a new line
+    - % followed by any data, then a new line, then other data
+
+    Args:
+        stream: a file object (with read and seek methods)
+    """
+    tok = stream.read(1)
+    if tok == b'%':
+        while tok not in (b'', b'\n'):
+            tok = stream.read(1)
 B_CACHE: Dict[Union[str, bytes], bytes] = {}
 WHITESPACES = (b' ', b'\n', b'\r', b'\t', b'\x00')
 WHITESPACES_AS_BYTES = b''.join(WHITESPACES)
